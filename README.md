@@ -43,15 +43,30 @@ Example:
 ```bash
 curl -i -X POST http://localhost:8080/events \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: evt-001" \
-  -H "X-Request-Id: req-001" \
-  -H "X-Correlation-Id: corr-001" \
+  -H "Idempotency-Key: evt-101" \
+  -H "X-Request-Id: req-101" \
+  -H "X-Correlation-Id: corr-101" \
   -d "{\"payload\":{\"eventType\":\"ORDER_CREATED\",\"orderId\":\"o-123\"}}"
+```
+### Windows PowerShell (Invoke-RestMethod)
+
+> Note: In Windows PowerShell, `curl` is often an alias for `Invoke-WebRequest`, so `curl -H ...` can fail.
+> Use `Invoke-RestMethod` (recommended) or `curl.exe`.
+
+### Happy path
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8080/events" `
+  -Headers @{
+    "Content-Type" = "application/json"
+    "Idempotency-Key" = "evt-101"
+  } `
+  -Body '{"payload":{"eventType":"ORDER_CREATED","orderId":"o-123"}}'
 ```
 
 ### Idempotency behavior
 - First request with a key creates and processes an event.
-- Repeating the same `Idempotency-Key` returns the existing event with `"duplicate": true`.
+- Re-run the same request with the same key to see `duplicate: true`.
 
 ### Retry + DLQ behavior
 - Processing retries with exponential backoff (`3` attempts by default).
@@ -64,6 +79,15 @@ curl -i -X POST http://localhost:8080/events \
   }
 }
 ```
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8080/events" `
+  -Headers @{
+    "Content-Type" = "application/json"
+    "Idempotency-Key" = "evt-fail-1"
+  } `
+  -Body '{"payload":{"eventType":"ORDER_CREATED","forceFail":true}}'
+```
 
 ## Design notes
 - In this MVP, retries are synchronous in the request path for simplicity.
@@ -72,3 +96,4 @@ curl -i -X POST http://localhost:8080/events \
   - process asynchronously via worker(s) + queue
   - schedule retries from DB metadata (`next_retry_at`) or broker delay queues
   - retain DLQ replay tooling
+
